@@ -1,0 +1,13 @@
+function crmNow_(){ return new Date().toISOString(); }
+function crmId_(){ return Utilities.getUuid(); }
+function crmResponse_(data){ return ContentService.createTextOutput(JSON.stringify({ok:true,data:data})).setMimeType(ContentService.MimeType.JSON); }
+function crmError_(error){ var msg=String(error && error.message || error); var code=/^(FORBIDDEN|UNAUTHORIZED|VALIDATION|NOT_FOUND|CONFLICT)$/.test(msg)?msg:'INTERNAL'; return ContentService.createTextOutput(JSON.stringify({ok:false,error:{code:code,message:code==='INTERNAL'?'Server xatosi':msg}})).setMimeType(ContentService.MimeType.JSON); }
+function crmSheet_(name){ var ss=SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID')); var sh=ss.getSheetByName(name); if(!sh) throw new Error('NOT_FOUND'); return sh; }
+function crmRows_(name){ var sh=crmSheet_(name), values=sh.getDataRange().getValues(); if(values.length<2)return []; var h=values[0]; return values.slice(1).filter(function(r){return r[0];}).map(function(r){var o={};h.forEach(function(k,i){o[k]=r[i];});return o;}); }
+function crmFind_(name,id){ var row=crmRows_(name).filter(function(x){return String(x.id)===String(id);})[0]; if(!row)throw new Error('NOT_FOUND');return row; }
+function crmInsert_(name,obj){ var sh=crmSheet_(name), headers=CRM.SHEETS[name], now=crmNow_(); obj.id=obj.id||crmId_(); if(headers.indexOf('createdAt')>=0)obj.createdAt=now; if(headers.indexOf('updatedAt')>=0)obj.updatedAt=now; sh.appendRow(headers.map(function(h){return obj[h]===undefined?'':obj[h];})); return obj; }
+function crmUpdate_(name,id,changes){ var sh=crmSheet_(name), values=sh.getDataRange().getValues(), h=values[0], idx=h.indexOf('id'); for(var r=1;r<values.length;r++)if(String(values[r][idx])===String(id)){h.forEach(function(key,c){if(changes[key]!==undefined)sh.getRange(r+1,c+1).setValue(changes[key]);});var u=h.indexOf('updatedAt');if(u>=0)sh.getRange(r+1,u+1).setValue(crmNow_());return crmFind_(name,id);}throw new Error('NOT_FOUND'); }
+function crmAudit_(user,action,entity,id,metadata){ crmInsert_('AuditLogs',{actorId:user.id,action:action,entity:entity,entityId:id,metadata:JSON.stringify(metadata||{})}); }
+function crmRequire_(data, keys){ keys.forEach(function(k){if(data[k]===undefined||data[k]===null||data[k]==='')throw new Error('VALIDATION');}); }
+function crmMinor_(value){ if(!/^\d+(\.\d{1,2})?$/.test(String(value)))throw new Error('VALIDATION'); return Math.round(Number(value)*100); }
+function crmUserSafe_(u){return {id:u.id,email:u.email,name:u.name,role:u.role,active:String(u.active)==='true'||u.active===true};}

@@ -1,0 +1,2 @@
+function crmNotifications_(user){return crmRows_('Notifications').filter(function(n){return !n.userId||n.userId===user.id;}).sort(function(a,b){return String(b.createdAt).localeCompare(String(a.createdAt));});}
+function crmReadNotification_(user,data){var n=crmFind_('Notifications',data.id);if(n.userId&&n.userId!==user.id)throw new Error('FORBIDDEN');return crmUpdate_('Notifications',n.id,{readAt:crmNow_()});}
